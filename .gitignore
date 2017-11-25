@@ -1,0 +1,10 @@
+/Library/
+/Temp/
+/Assets/SourceData.csv
+/Assets/SourceData.csv.meta
+/TerrorVis.csproj
+/TerrorVis.Editor.csproj
+/TerrorVis.Plugins.csproj
+/TerrorVis.sln
+/Packages/
+/.vs/
