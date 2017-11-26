@@ -10,21 +10,32 @@ public class MainScript : MonoBehaviour
     public Material Mat;
     public ComputeShader HeatmapCompute;
 
-    private const int TextureResolution = 512;
-    public RenderTexture _heatmapTexture;
+    [Range(0, 1)]
+    public float MinTime;
+    [Range(0, 1)]
+    public float MaxTime;
+
+    private const int TextureResolution = 256;
     private const int GroupSize = 128;
-    private int _groupsToDispatch;
+    private int _groupsToComputeKillmap;
+    private int _groupsToClear;
     private int _computeKernel;
+    private int _clearKernel;
+    private int _dataCount;
     private ComputeBuffer _dataBuffer;
+    private ComputeBuffer _foreignKillsBuffer;
+    private ComputeBuffer _domesticKillsBuffer;
     private const int DataBufferStride = sizeof(float) * 2 + // Lat and Long
-                                        sizeof(int) + // Deaths
-                                        sizeof(float); // AttackSource
+                                        sizeof(int) + // ForeignKills
+                                        sizeof(int) + // DomesticKills
+                                        sizeof(float); // Time
 
     struct BufferPoint
     {
         public Vector2 Pos;
-        public int Deaths;
-        public float AttackSource;
+        public int ForeignKills;
+        public int DomesticKills;
+        public float Time;
     }
 
     void Start()
@@ -33,50 +44,72 @@ public class MainScript : MonoBehaviour
         //RefreshSource(preprocessedDataPath);
         List<TerrorismDataPoint> data = DataLoader.LoadDataPointsFromPreprocess(preprocessedDataPath);
 
-        _heatmapTexture = new RenderTexture(TextureResolution, TextureResolution, 0, RenderTextureFormat.RGFloat);
-        _heatmapTexture.enableRandomWrite = true;
-        _heatmapTexture.Create();
-
         _computeKernel = HeatmapCompute.FindKernel("HeatmapCompute");
+        _clearKernel = HeatmapCompute.FindKernel("ClearBuffers");
         _dataBuffer = GetDataBuffer(data);
-        _groupsToDispatch = Mathf.CeilToInt(data.Count / GroupSize);
-
-        ProcessHeatmap();
+        _dataCount = data.Count;
+        _foreignKillsBuffer = new ComputeBuffer(TextureResolution * TextureResolution, sizeof(int));
+        _domesticKillsBuffer = new ComputeBuffer(TextureResolution * TextureResolution, sizeof(int));
+        _groupsToComputeKillmap = Mathf.CeilToInt((float)data.Count / GroupSize);
+        _groupsToClear = (512 * 512) / GroupSize;
+        
     }
 
     private void ProcessHeatmap()
     {
-        RenderTexture.active = _heatmapTexture;
-        GL.Clear(false, true, Color.black);
-        RenderTexture.active = null;
-        HeatmapCompute.SetTexture(_computeKernel, "_HeatmapTexture", _heatmapTexture);
+        HeatmapCompute.SetInt("_MaxThread", _dataCount);
+        HeatmapCompute.SetBuffer(_clearKernel, "_ForeignKillsBuffer", _foreignKillsBuffer);
+        HeatmapCompute.SetBuffer(_clearKernel, "_DomesticKilsBuffer", _domesticKillsBuffer);
+        HeatmapCompute.Dispatch(_clearKernel, _groupsToClear, 1, 1);
+        
+        HeatmapCompute.SetFloat("_MinTime", MinTime);
+        HeatmapCompute.SetFloat("_MaxTime", MaxTime);
         HeatmapCompute.SetBuffer(_computeKernel, "_DataBuffer", _dataBuffer);
-        HeatmapCompute.Dispatch(_computeKernel, _groupsToDispatch, 1, 1);
+        HeatmapCompute.SetBuffer(_computeKernel, "_ForeignKillsBuffer", _foreignKillsBuffer);
+        HeatmapCompute.SetBuffer(_computeKernel, "_DomesticKilsBuffer", _domesticKillsBuffer);
+        HeatmapCompute.Dispatch(_computeKernel, _groupsToComputeKillmap, 1, 1);
     }
 
     private void Update()
     {
-        Mat.SetTexture("_MainTex", _heatmapTexture);
+        MinTime = Mathf.Min(MinTime, MaxTime);
+        MaxTime = Mathf.Max(MinTime, MaxTime);
+        ProcessHeatmap();
+
+        Mat.SetBuffer("_ForeignKillsBuffer", _foreignKillsBuffer);
+        Mat.SetBuffer("_DomesticKilsBuffer", _domesticKillsBuffer);
     }
 
     private ComputeBuffer GetDataBuffer(List<TerrorismDataPoint> sourceData)
     {
+        long start = sourceData.Min(item => item.Time.Ticks);
+        long end = sourceData.Max(item => item.Time.Ticks);
         ComputeBuffer ret = new ComputeBuffer(sourceData.Count, DataBufferStride);
-        BufferPoint[] bufferData = sourceData.Select(ToBufferPoint).ToArray();
+        BufferPoint[] bufferData = new BufferPoint[sourceData.Count];
+        for (int i = 0; i < sourceData.Count; i++)
+        {
+            BufferPoint newPoint = ToBufferPoint(sourceData[i], start, end);
+            bufferData[i] = newPoint;
+        }
         ret.SetData(bufferData);
         return ret;
     }
 
-    private static BufferPoint ToBufferPoint(TerrorismDataPoint dataPoint)
+    private static BufferPoint ToBufferPoint(TerrorismDataPoint dataPoint, long start, long end)
     {
         float normalizedLat = (dataPoint.Lat + 90f) / 180f;
         float normalizedLong = (dataPoint.Long + 180f) / 360f;
         float attackSource = ToAttackSourceWeight(dataPoint.AttackSource);
+        float normalizedTime = (float)((double)(dataPoint.Time.Ticks - start) / (end - start));
+        Vector2 pos = new Vector2(normalizedLat, normalizedLong);
+        int foreignKills = (int)((double)dataPoint.Deaths * attackSource);
+        int domesticKills = (int)((double)dataPoint.Deaths * (1 - attackSource));
         return new BufferPoint()
         {
-            Pos = new Vector2(normalizedLat, normalizedLong),
-            Deaths = dataPoint.Deaths,
-            AttackSource = attackSource
+            Pos = pos,
+            ForeignKills = foreignKills,
+            DomesticKills = domesticKills,
+            Time = normalizedTime
         };
     }
 
@@ -96,19 +129,14 @@ public class MainScript : MonoBehaviour
 
     private void RefreshSource(string preprocessedDataPath)
     {
-        string dataSourcePath = Application.dataPath + "\\SourceData.csv";
-        if (!File.Exists(dataSourcePath))
-        {
-            Debug.LogError(dataSourcePath + " does not exist. You may need to unzip Assests\\SourceData.zip first.");
-            return;
-        }
-        List<TerrorismDataPoint> data = DataLoader.LoadDataPointsFromSource(dataSourcePath);
+        List<TerrorismDataPoint> data = DataLoader.LoadDataPointsFromSource();
         DataLoader.SaveDataPoints(data, preprocessedDataPath);
     }
 
     private void OnDestroy()
     {
         _dataBuffer.Release();
-        _heatmapTexture.Release();
+        _foreignKillsBuffer.Release();
+        _domesticKillsBuffer.Release();
     }
 }

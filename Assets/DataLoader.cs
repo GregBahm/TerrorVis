@@ -4,9 +4,21 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Xml;
+using System.IO;
 
 public static class DataLoader
 {
+    public static List<TerrorismDataPoint> LoadDataPointsFromSource()
+    {
+        string dataSourcePath = Application.dataPath + "\\SourceData.csv";
+        if (!File.Exists(dataSourcePath))
+        {
+            Debug.LogError(dataSourcePath + " does not exist. You may need to unzip Assests\\SourceData.zip first.");
+            throw new Exception();
+        }
+        return LoadDataPointsFromSource(dataSourcePath);
+    }
+
     public static List<TerrorismDataPoint> LoadDataPointsFromSource(string dataSourcePath)
     {
         System.IO.StreamReader file = new System.IO.StreamReader(dataSourcePath);

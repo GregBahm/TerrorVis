@@ -1,21 +1,49 @@
 ﻿#pragma kernel HeatmapCompute
+#pragma kernel ClearBuffers
 
-#define TextureResolution 512
-RWTexture2D<float2> _HeatmapTexture;
+#define TextureResolution 256
 
 struct BufferPoint
 {
     float2 Pos;
-    int Deaths;
-    float AttackSource;
+    int ForeignKills;
+    int DomesticKills;
+    float Time;
 };
 
+float _MinTime;
+float _MaxTime;
+
 StructuredBuffer<BufferPoint> _DataBuffer;
+RWStructuredBuffer<int> _ForeignKillsBuffer;
+RWStructuredBuffer<int> _DomesticKilsBuffer;
+
+uint UvsToIndex(float2 uv)
+{
+    uint yPart = (uint)(uv.y * TextureResolution) * TextureResolution;
+    uint xPart = uv.x * TextureResolution; 
+    return xPart + yPart;
+}
 
 [numthreads(128,1,1)]
 void HeatmapCompute (uint3 id : SV_DispatchThreadID)
 {
     BufferPoint dataPoint = _DataBuffer[id.x];
-    float2 valToAdd = float2(dataPoint.Deaths * dataPoint.AttackSource, dataPoint.Deaths * (1 - dataPoint.AttackSource));
-	_HeatmapTexture[dataPoint.Pos * TextureResolution] += valToAdd;
+    uint index = UvsToIndex(dataPoint.Pos);
+    float timeWeight = 1 - abs(dataPoint.Time - _MinTime) * 4;
+    timeWeight = 1 ;//saturate(timeWeight);
+    
+    //if(dataPoint.Time >= _MinTime && dataPoint.Time <= _MaxTime)
+    //{
+        InterlockedAdd(_ForeignKillsBuffer[index], dataPoint.ForeignKills * timeWeight);
+        InterlockedAdd(_DomesticKilsBuffer[index], dataPoint.DomesticKills * timeWeight);
+    //}
+}
+
+ 
+[numthreads(128,1,1)]
+void ClearBuffers (uint3 id : SV_DispatchThreadID)
+{
+    _ForeignKillsBuffer[id.x] = 0;
+    _DomesticKilsBuffer[id.x] = 0;
 }

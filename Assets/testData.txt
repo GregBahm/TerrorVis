@@ -1,0 +1,30 @@
+<Root>
+  <DataPoint>
+    <Lat>47.36865</Lat>
+    <Long>-122.4196</Long>
+    <Deaths>100</Deaths>
+    <Domestic>2</Domestic>
+    <Time>621395712000000000</Time>
+  </DataPoint>
+  <DataPoint>
+    <Lat>47.36865</Lat>
+    <Long>8.539182</Long>
+    <Deaths>47</Deaths>
+    <Domestic>0</Domestic>
+    <Time>621400032000000000</Time>
+  </DataPoint>
+  <DataPoint>
+    <Lat>40.71278</Lat>
+    <Long>-74.00594</Long>
+    <Deaths>1383</Deaths>
+    <Domestic>0</Domestic>
+    <Time>631357632000000000</Time>
+  </DataPoint>
+  <DataPoint>
+    <Lat>18.46617</Lat>
+    <Long>-66.10665</Long>
+    <Deaths>200</Deaths>
+    <Domestic>0</Domestic>
+    <Time>621410400000000000</Time>
+  </DataPoint>
+</Root>
