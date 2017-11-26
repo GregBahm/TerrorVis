@@ -52,14 +52,22 @@ public static class DataLoader
     }
 }
 
+public enum AttackSource
+{
+    International,
+    Domestic,
+    Unknown
+}
+
 public class TerrorismDataPoint
 {
     public readonly float Lat;
     public readonly float Long;
     public readonly int Deaths;
+    public readonly AttackSource AttackSource;
     public readonly DateTime Time;
 
-    public TerrorismDataPoint(string latString, string longString, string deathsString, DateTime time)
+    public TerrorismDataPoint(string latString, string longString, string deathsString, AttackSource attackSource, DateTime time)
     { 
         if (latString == "" || longString == "")
         {
@@ -67,10 +75,12 @@ public class TerrorismDataPoint
         }
         Lat = Convert.ToSingle(latString);
         Long = Convert.ToSingle(longString);
+        AttackSource = attackSource;
         if (deathsString != "")
         {
             Deaths = Convert.ToInt32(deathsString);
         }
+        Time = time;
     }
 
     public static TerrorismDataPoint LoadFromSource(string rawLine)
@@ -82,6 +92,9 @@ public class TerrorismDataPoint
         string monthString = splitLine[2];
         string dayString = splitLine[3];
         string deathsString = splitLine[98];
+        string logisticalString = splitLine[133];
+        
+        AttackSource attackSource = GetAttackSourceFromString(logisticalString);
 
         int year = Convert.ToInt32(yearString);
         int month = Convert.ToInt32(monthString);
@@ -95,13 +108,27 @@ public class TerrorismDataPoint
             day = 1;
         }
         DateTime time = new DateTime(year, month, day);
-        return new TerrorismDataPoint(latString, longString, deathsString, time);
+        return new TerrorismDataPoint(latString, longString, deathsString, attackSource, time);
+    }
+
+    private static AttackSource GetAttackSourceFromString(string logisticalString)
+    {
+        if(logisticalString == "0")
+        {
+            return AttackSource.Domestic;
+        }
+        if(logisticalString == "1")
+        {
+            return AttackSource.International;
+        }
+        return AttackSource.Unknown;
     }
 
     public const string XmlNodeName = "DataPoint";
     public const string XmlLatNodeName = "Lat";
     public const string XmlLongNodeName = "Long";
     public const string XmlDeathsNodeName = "Deaths";
+    public const string XmlAttackSourceNodeName = "Domestic";
     public const string XmlDateNodeName = "Time";
 
     public XmlElement ToXml(XmlDocument doc)
@@ -117,12 +144,16 @@ public class TerrorismDataPoint
         XmlElement deathsNode = doc.CreateElement(XmlDeathsNodeName);
         deathsNode.InnerText = Deaths.ToString();
 
+        XmlElement domesticNode = doc.CreateElement(XmlAttackSourceNodeName);
+        domesticNode.InnerText = ((int)AttackSource).ToString();
+
         XmlElement dateNode = doc.CreateElement(XmlDateNodeName);
         dateNode.InnerText = Time.Ticks.ToString();
 
         ret.AppendChild(latNode);
         ret.AppendChild(longNode);
         ret.AppendChild(deathsNode);
+        ret.AppendChild(domesticNode);
         ret.AppendChild(dateNode);
 
         return ret;
@@ -133,10 +164,13 @@ public class TerrorismDataPoint
         string latString = node.SelectSingleNode(XmlLatNodeName).InnerText;
         string longString = node.SelectSingleNode(XmlLongNodeName).InnerText;
         string deathsString = node.SelectSingleNode(XmlDeathsNodeName).InnerText;
+        string domesticString = node.SelectSingleNode(XmlDeathsNodeName).InnerText;
         string timeTicks = node.SelectSingleNode(XmlDateNodeName).InnerText;
+        string attackSourceString = node.SelectSingleNode(XmlAttackSourceNodeName).InnerText;
         long ticks = Convert.ToInt64(timeTicks);
         DateTime time = new DateTime(ticks);
-        return new TerrorismDataPoint(latString, longString, deathsString, time);
+        AttackSource attackSource = (AttackSource)Convert.ToInt32(attackSourceString);
+        return new TerrorismDataPoint(latString, longString, deathsString, attackSource, time);
     }
 }
 

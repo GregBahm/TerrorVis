@@ -1,12 +1,13 @@
 ﻿#pragma kernel HeatmapCompute
 
 #define TextureResolution 512
-RWTexture2D<float> _HeatmapTexture;
+RWTexture2D<float2> _HeatmapTexture;
 
 struct BufferPoint
 {
     float2 Pos;
     int Deaths;
+    float AttackSource;
 };
 
 StructuredBuffer<BufferPoint> _DataBuffer;
@@ -15,6 +16,6 @@ StructuredBuffer<BufferPoint> _DataBuffer;
 void HeatmapCompute (uint3 id : SV_DispatchThreadID)
 {
     BufferPoint dataPoint = _DataBuffer[id.x];
-
-	_HeatmapTexture[dataPoint.Pos * TextureResolution] += dataPoint.Deaths;
+    float2 valToAdd = float2(dataPoint.Deaths * dataPoint.AttackSource, dataPoint.Deaths * (1 - dataPoint.AttackSource));
+	_HeatmapTexture[dataPoint.Pos * TextureResolution] += valToAdd;
 }
