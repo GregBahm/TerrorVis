@@ -10,9 +10,9 @@ struct BufferPoint
     int DomesticKills;
     float Time;
 };
-
-float _MinTime;
-float _MaxTime;
+ 
+float _Time;
+float _Range;
 
 StructuredBuffer<BufferPoint> _DataBuffer;
 RWStructuredBuffer<int> _ForeignKillsBuffer;
@@ -30,14 +30,18 @@ void HeatmapCompute (uint3 id : SV_DispatchThreadID)
 {
     BufferPoint dataPoint = _DataBuffer[id.x];
     uint index = UvsToIndex(dataPoint.Pos);
-    float timeWeight = 1 - abs(dataPoint.Time - _MinTime) * 4;
-    timeWeight = 1 ;//saturate(timeWeight);
-    
-    //if(dataPoint.Time >= _MinTime && dataPoint.Time <= _MaxTime)
-    //{
-        InterlockedAdd(_ForeignKillsBuffer[index], dataPoint.ForeignKills * timeWeight);
-        InterlockedAdd(_DomesticKilsBuffer[index], dataPoint.DomesticKills * timeWeight);
-    //}
+
+    float timeWeight = abs(dataPoint.Time - _Time);
+    timeWeight = timeWeight / _Range;
+    timeWeight = saturate(timeWeight);
+    timeWeight = pow(timeWeight, 2);
+
+    float fill = saturate(_Range - 1) * 2;
+    timeWeight *=  1 - fill;
+    timeWeight = 1 - timeWeight;
+
+    InterlockedAdd(_ForeignKillsBuffer[index], dataPoint.ForeignKills * timeWeight);
+    InterlockedAdd(_DomesticKilsBuffer[index], dataPoint.DomesticKills * timeWeight);
 }
 
  

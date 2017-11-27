@@ -7,14 +7,15 @@ using UnityEngine;
 
 public class MainScript : MonoBehaviour
 {
+    [Range(0, 1)]
+    public float Time;
+
+    [Range(0, 1.5f)]
+    public float Range;
+
     public Material Mat;
     public ComputeShader HeatmapCompute;
-
-    [Range(0, 1)]
-    public float MinTime;
-    [Range(0, 1)]
-    public float MaxTime;
-
+    
     private const int TextureResolution = 256;
     private const int GroupSize = 128;
     private int _groupsToComputeKillmap;
@@ -62,8 +63,8 @@ public class MainScript : MonoBehaviour
         HeatmapCompute.SetBuffer(_clearKernel, "_DomesticKilsBuffer", _domesticKillsBuffer);
         HeatmapCompute.Dispatch(_clearKernel, _groupsToClear, 1, 1);
         
-        HeatmapCompute.SetFloat("_MinTime", MinTime);
-        HeatmapCompute.SetFloat("_MaxTime", MaxTime);
+        HeatmapCompute.SetFloat("_Time", Time);
+        HeatmapCompute.SetFloat("_Range", Range);
         HeatmapCompute.SetBuffer(_computeKernel, "_DataBuffer", _dataBuffer);
         HeatmapCompute.SetBuffer(_computeKernel, "_ForeignKillsBuffer", _foreignKillsBuffer);
         HeatmapCompute.SetBuffer(_computeKernel, "_DomesticKilsBuffer", _domesticKillsBuffer);
@@ -72,8 +73,6 @@ public class MainScript : MonoBehaviour
 
     private void Update()
     {
-        MinTime = Mathf.Min(MinTime, MaxTime);
-        MaxTime = Mathf.Max(MinTime, MaxTime);
         ProcessHeatmap();
 
         Mat.SetBuffer("_ForeignKillsBuffer", _foreignKillsBuffer);

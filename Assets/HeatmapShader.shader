@@ -2,7 +2,6 @@
 {
 	Properties
 	{
-        _MapTexture("Map Texture", 2D) = "white"{}
         _HeightScaleA("Height Scale A", Float) = 1
         _HeightScaleB("Height Scale B", Float) = 1
         _HeatColorRamp("Heat Color Ramp", Float) = 1

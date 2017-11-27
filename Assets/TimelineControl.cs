@@ -5,15 +5,11 @@ using UnityEngine;
 
 public class TimelineControl : MonoBehaviour
 {
+    public MainScript Main;
+
     public Material YearBoxMat;
     private const int startYear = 1970;
     private const int endYear = 2017;
-
-    [Range(0, 1)]
-    public float Time;
-
-    [Range(0, 1.5f)]
-    public float Range;
 
     private List<Transform> _yearBoxes;
 
@@ -55,13 +51,13 @@ public class TimelineControl : MonoBehaviour
     private void DoYearBox(int i)
     {
         float param = (float)i / _yearBoxes.Count;
-        float distToTime = Mathf.Abs(Time - param);
+        float distToTime = Mathf.Abs(Main.Time - param);
 
-        float weight = distToTime / Range;
+        float weight = distToTime / Main.Range;
         weight = Mathf.Clamp01(weight);
         weight = Mathf.Pow(weight, 2);
 
-        float fill = Mathf.Clamp01((Range - 1f) * 2);
+        float fill = Mathf.Clamp01((Main.Range - 1f) * 2);
         weight = Mathf.Lerp(weight, 0, fill);
 
         Transform box = _yearBoxes[i];
